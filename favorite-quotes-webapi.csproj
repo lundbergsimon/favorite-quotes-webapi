@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>favorite_quotes_webapi</RootNamespace>
+    <RootNamespace>FavoriteQuoutesWebApi</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
