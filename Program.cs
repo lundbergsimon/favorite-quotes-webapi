@@ -4,7 +4,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddCors(
+    options =>
+    {
+        options.AddPolicy("AllowAngularApp", policy =>
+        {
+            policy.WithOrigins("http://localhost:4200") // TODO: Update to use environment variable
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+    }
+);
 
 // Build app
 var app = builder.Build();
@@ -18,6 +28,9 @@ if (app.Environment.IsDevelopment())
 
 // Configure the HTTP request pipeline to use HTTPS redirection.
 app.UseHttpsRedirection();
+
+// Enable CORS
+app.UseCors("AllowAngularApp");
 
 // Add endpoints
 app.MapControllers();
