@@ -1,0 +1,50 @@
+# .NET Build Outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# User-Specific Files
+.vscode/
+*.csproj.user
+.idea/
+*.sln.iml
+.vs/
+*.suo
+*.user
+*.cache
+
+# NuGet Packages
+packages/
+.nuget/
+
+# Logs and Temporary Files
+*.log
+logs/
+*.tmp
+
+# Configuration Files
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+
+# Development Certificates
+*.pfx
+*.cer
+
+# Test and Coverage Reports
+TestResults/
+*.trx
+*.coverage
+coverage.*
+
+# Publish Artifacts
+publish/
+*.pubxml
+*.publishsettings
+
+# User Secrets
+*.secrets
+*.key
+user-secrets/
