@@ -48,3 +48,7 @@ publish/
 *.secrets
 *.key
 user-secrets/
+
+
+# Other
+profile.arm.json
