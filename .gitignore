@@ -1,6 +1,7 @@
 # .NET Build Outputs
 bin/
 obj/
+out/
 *.dll
 *.exe
 *.pdb
@@ -49,6 +50,7 @@ publish/
 *.key
 user-secrets/
 
-
 # Other
+Dockerfile
+deploy.yml
 profile.arm.json
