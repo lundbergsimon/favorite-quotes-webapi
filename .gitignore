@@ -49,3 +49,8 @@ publish/
 *.secrets
 *.key
 user-secrets/
+
+# Other
+Dockerfile
+deploy.yml
+profile.arm.json
