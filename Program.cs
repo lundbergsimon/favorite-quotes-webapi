@@ -11,6 +11,7 @@ builder.Services.AddCors(
         {
             policy.WithOrigins("http://localhost:4200") // TODO: Update to use environment variable
                 .AllowAnyHeader()
+                .AllowCredentials()
                 .AllowAnyMethod();
         });
     }
