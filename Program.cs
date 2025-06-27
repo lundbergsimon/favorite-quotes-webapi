@@ -9,10 +9,22 @@ builder.Services.AddCors(
     {
         options.AddPolicy("AllowAngularApp", policy =>
         {
-            policy.WithOrigins("http://localhost:4200") // TODO: Update to use environment variable
-                .AllowAnyHeader()
-                .AllowCredentials()
-                .AllowAnyMethod();
+            if (builder.Environment.IsDevelopment())
+            {
+
+                policy.WithOrigins("http://localhost:4200")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
+            }
+            else
+            {
+                policy
+                    .WithOrigins("simon-book-listing.netlify.app")
+                    .WithMethods("GET", "POST", "PUT", "DELETE")
+                    .WithHeaders("Content-Type", "Authorization")
+                    .AllowCredentials();
+            }
         });
     }
 );
