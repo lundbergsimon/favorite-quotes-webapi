@@ -20,7 +20,7 @@ builder.Services.AddCors(
             else
             {
                 policy
-                    .WithOrigins("https://icy-stone-036690203.6.azurestaticapps.net")
+                    .WithOrigins("https://books-and-quotes-backend.onrender.com")
                     .WithMethods("GET", "POST", "PUT", "DELETE")
                     .WithHeaders("Content-Type", "Authorization")
                     .AllowCredentials();
