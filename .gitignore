@@ -2,6 +2,7 @@
 bin/
 obj/
 out/
+publish/
 *.dll
 *.exe
 *.pdb
@@ -51,6 +52,5 @@ publish/
 user-secrets/
 
 # Other
-Dockerfile
 deploy.yml
 profile.arm.json
