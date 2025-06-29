@@ -20,7 +20,7 @@ builder.Services.AddCors(
             else
             {
                 policy
-                    .WithOrigins("https://books-and-quotes-backend.onrender.com")
+                    .WithOrigins("https://books-and-quotes-frontend.onrender.com")
                     // .WithMethods("GET", "POST", "PUT", "DELETE")
                     // .WithHeaders("Content-Type", "Authorization")
                     .AllowAnyMethod()
