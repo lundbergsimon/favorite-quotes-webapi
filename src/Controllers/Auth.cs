@@ -73,8 +73,8 @@ namespace FavoriteQuoutesWebApi.Controllers
             {
                 HttpOnly = true,
                 Expires = new DateTimeOffset(refreshToken.Expires),
-                SameSite = SameSiteMode.Lax, // TODO: Adjust for environment
-                Secure = true // TODO: Adjust for environment
+                SameSite = SameSiteMode.None,
+                Secure = true
             };
             Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
         }
@@ -85,7 +85,7 @@ namespace FavoriteQuoutesWebApi.Controllers
             {
                 HttpOnly = true,
                 Expires = DateTime.UtcNow.AddDays(-1), // Set expiry to past to ensure deletion
-                SameSite = SameSiteMode.Lax,
+                SameSite = SameSiteMode.None,
                 Secure = true // Must match SetRefreshTokenCookie's Secure setting
             };
             Response.Cookies.Delete("refreshToken", cookieOptions);
