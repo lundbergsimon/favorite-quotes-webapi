@@ -20,7 +20,7 @@ builder.Services.AddCors(
             else
             {
                 policy
-                    .WithOrigins("simon-book-listing.netlify.app")
+                    .WithOrigins("https://icy-stone-036690203.6.azurestaticapps.net")
                     .WithMethods("GET", "POST", "PUT", "DELETE")
                     .WithHeaders("Content-Type", "Authorization")
                     .AllowCredentials();
