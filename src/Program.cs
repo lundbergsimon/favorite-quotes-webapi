@@ -21,8 +21,10 @@ builder.Services.AddCors(
             {
                 policy
                     .WithOrigins("https://books-and-quotes-backend.onrender.com")
-                    .WithMethods("GET", "POST", "PUT", "DELETE")
-                    .WithHeaders("Content-Type", "Authorization")
+                    // .WithMethods("GET", "POST", "PUT", "DELETE")
+                    // .WithHeaders("Content-Type", "Authorization")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
                     .AllowCredentials();
             }
         });
