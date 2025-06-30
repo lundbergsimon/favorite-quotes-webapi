@@ -20,9 +20,11 @@ builder.Services.AddCors(
             else
             {
                 policy
-                    .WithOrigins("simon-book-listing.netlify.app")
-                    .WithMethods("GET", "POST", "PUT", "DELETE")
-                    .WithHeaders("Content-Type", "Authorization")
+                    .WithOrigins("https://books-and-quotes-frontend.onrender.com")
+                    // .WithMethods("GET", "POST", "PUT", "DELETE")
+                    // .WithHeaders("Content-Type", "Authorization")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
                     .AllowCredentials();
             }
         });
@@ -33,11 +35,11 @@ builder.Services.AddCors(
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// if (app.Environment.IsDevelopment())
+// {
+app.UseSwagger();
+app.UseSwaggerUI();
+// }
 
 // Configure the HTTP request pipeline to use HTTPS redirection.
 app.UseHttpsRedirection();
