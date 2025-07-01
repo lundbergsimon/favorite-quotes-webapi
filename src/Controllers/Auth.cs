@@ -11,7 +11,6 @@ namespace FavoriteQuoutesWebApi.Controllers
     [Route("auth")]
     public class AuthController : ControllerBase
     {
-        // TODO: Replace with a database
         private static List<User> users = new List<User>();
         private static List<RefreshToken> refreshTokens = new List<RefreshToken>();
 
@@ -24,6 +23,13 @@ namespace FavoriteQuoutesWebApi.Controllers
         private readonly int _refreshTokenExpirationDays;
         private CookieOptions _cookieOptions;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AuthController"/> class.
+        /// Sets up JWT configuration, secret key, issuer, audience, and token expiration times from configuration settings.
+        /// Configures cookie options based on the environment.
+        /// </summary>
+        /// <param name="configuration">The configuration interface providing access to application settings.</param>
+        /// <param name="env">The hosting environment interface providing environment-specific information.</param>
         public AuthController(IConfiguration configuration, IWebHostEnvironment env)
         {
             _env = env;
@@ -42,6 +48,11 @@ namespace FavoriteQuoutesWebApi.Controllers
             };
         }
 
+        /// <summary>
+        /// Generates a JWT access token for the given user.
+        /// </summary>
+        /// <param name="user">The user to generate the token for.</param>
+        /// <returns>A JWT access token string.</returns>
         private string GenerateAccessToken(User user)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
@@ -63,6 +74,12 @@ namespace FavoriteQuoutesWebApi.Controllers
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
+        /// <summary>
+        /// Generates a refresh token for the given user and IP address.
+        /// </summary>
+        /// <param name="user">The user to generate the token for.</param>
+        /// <param name="ipAddress">The IP address of the client device.</param>
+        /// <returns>A new <see cref="RefreshToken"/> instance.</returns>
         private RefreshToken GenerateRefreshtoken(User user, string ipAddress)
         {
             var refreshToken = new RefreshToken
@@ -88,6 +105,12 @@ namespace FavoriteQuoutesWebApi.Controllers
             Response.Cookies.Delete("refreshToken", _cookieOptions);
         }
 
+        /// <summary>
+        /// Registers a new user account.
+        /// </summary>
+        /// <param name="request">The registration request containing the username and password.</param>
+        /// <returns>An authentication response containing an access token and user information.</returns>
+        /// <remarks>If the username already exists, a conflict status code is returned.</remarks>
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest request)
         {
@@ -100,19 +123,15 @@ namespace FavoriteQuoutesWebApi.Controllers
                 PasswordHash = request.Password // TODO: Hash password
             };
 
-            // TODO: Replace with a database
             users.Add(newUser);
 
             var accessToken = GenerateAccessToken(newUser);
             var refreshToken = GenerateRefreshtoken(newUser, HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown");
 
-            // TODO: Replace with a database
             refreshTokens.Add(refreshToken);
 
             // Set refresh token as HTTP-only cookie
             SetRefreshTokenCookie(refreshToken);
-
-            // Console.WriteLine($"Refresh tokens (reg): {System.Text.Json.JsonSerializer.Serialize(refreshTokens)}");
 
             return Ok(new AuthResponse
             {
@@ -121,19 +140,24 @@ namespace FavoriteQuoutesWebApi.Controllers
             });
         }
 
+        /// <summary>
+        /// Logs in a user account.
+        /// </summary>
+        /// <param name="request">The login request containing the username and password.</param>
+        /// <returns>An authentication response containing an access token and user information.</returns>
+        /// <remarks>If the username or password is invalid, an unauthorized status code is returned.</remarks>
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
             var user = users.FirstOrDefault(u => u.Username == request.Username);
 
-            // TODO: Validate password
-            if (user == null)
+            if (user == null || user.PasswordHash != request.Password) // TODO: Hash password
                 return Unauthorized(new { message = "Invalid credentials." });
 
             var accessToken = GenerateAccessToken(user);
             var refreshToken = GenerateRefreshtoken(user, HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown");
 
-            // TODO: Revoke any existing refresh tokens for this user for security
+            // Revoke any existing refresh tokens for this user for security
             var existingRefreshTokens = refreshTokens.Where(t => t.UserId == user.Id && t.IsActive).ToList();
             foreach (var token in existingRefreshTokens)
             {
@@ -141,13 +165,9 @@ namespace FavoriteQuoutesWebApi.Controllers
                 token.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             }
 
-            // TODO: Replace with a database
             refreshTokens.Add(refreshToken);
 
-            // Set refresh token as HTTP-only cookie
             SetRefreshTokenCookie(refreshToken);
-
-            Console.WriteLine($"Refresh tokens (li): {System.Text.Json.JsonSerializer.Serialize(refreshTokens)}");
 
             return Ok(new AuthResponse
             {
@@ -156,11 +176,17 @@ namespace FavoriteQuoutesWebApi.Controllers
             });
         }
 
+        /// <summary>
+        /// Refreshes an access token given a valid refresh token.
+        /// </summary>
+        /// <returns>An authentication response containing an access token and user information.</returns>
+        /// <remarks>
+        /// If the refresh token is invalid, expired, or revoked, an unauthorized status code is returned.
+        /// If the refresh token has been reused, all tokens for that user are revoked.
+        /// </remarks>
         [HttpPost("refresh-token")]
         public IActionResult RefreshToken()
         {
-            Console.WriteLine($"Refresh tokens (rt): {System.Text.Json.JsonSerializer.Serialize(refreshTokens.Select(t => new { t.Token, t.IsActive }))}");
-
             var refreshTokenString = Request.Cookies["refreshToken"];
             if (string.IsNullOrEmpty(refreshTokenString))
             {
@@ -181,7 +207,6 @@ namespace FavoriteQuoutesWebApi.Controllers
                         token.Revoked = DateTime.UtcNow;
                         token.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
                     }
-                    Console.WriteLine($"Token reuse detected for User ID {userWhoTriedToReuse}. All tokens revoked.");
                 }
                 return Unauthorized(new { message = "Invalid or expired refresh token." });
             }
@@ -196,12 +221,11 @@ namespace FavoriteQuoutesWebApi.Controllers
             var newAccessToken = GenerateAccessToken(user);
             var newRefreshToken = GenerateRefreshtoken(user, HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown");
 
-            // Mark old refreshToken as replaced
+            // Mark old refreshToken as revoked and replaced
             refreshToken.Revoked = DateTime.UtcNow;
             refreshToken.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             refreshToken.ReplacedByToken = newRefreshToken.Token;
 
-            // TODO: Replace with a database
             refreshTokens.Add(newRefreshToken);
 
             // Set refresh token as HTTP-only cookie
@@ -214,22 +238,30 @@ namespace FavoriteQuoutesWebApi.Controllers
             });
         }
 
+        /// <summary>
+        /// Revokes the refresh token associated with the user that made this request,
+        /// and removes the refresh token cookie from the client.
+        /// </summary>
+        /// <returns>A JSON response with a success message.</returns>
         [HttpPost("logout")]
         public IActionResult Logout()
         {
             var refreshTokenString = Request.Cookies["refreshToken"];
             if (!string.IsNullOrEmpty(refreshTokenString))
             {
+                // Revoke the refresh token
                 var refreshToken = refreshTokens.SingleOrDefault(t => t.Token == refreshTokenString);
                 if (refreshToken != null)
                 {
                     refreshToken.Revoked = DateTime.UtcNow;
                     refreshToken.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-                    Console.WriteLine($"Refresh token for user {refreshToken.UserId} revoked upon logout.");
                 }
             }
 
+            // Clear refresh token cookie on the client
             ClearRefreshTokenCookie();
+
+            // Return success response
             return Ok(new { message = "Logged out successfully!" });
         }
     }
