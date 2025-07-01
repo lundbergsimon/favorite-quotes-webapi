@@ -22,6 +22,7 @@ namespace FavoriteQuoutesWebApi.Controllers
         private readonly string _audience;
         private readonly int _accessTokenExpirationMinutes;
         private readonly int _refreshTokenExpirationDays;
+        private CookieOptions _cookieOptions;
 
         public AuthController(IConfiguration configuration, IWebHostEnvironment env)
         {
@@ -33,6 +34,12 @@ namespace FavoriteQuoutesWebApi.Controllers
             _audience = jwtSettings["Audience"]!;
             _accessTokenExpirationMinutes = int.Parse(jwtSettings["AccessTokenExpirationMinutes"]!);
             _refreshTokenExpirationDays = int.Parse(jwtSettings["RefreshTokenExpirationDays"]!);
+            _cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
+                Secure = !_env.IsDevelopment()
+            };
         }
 
         private string GenerateAccessToken(User user)
@@ -71,26 +78,14 @@ namespace FavoriteQuoutesWebApi.Controllers
 
         private void SetRefreshTokenCookie(RefreshToken refreshToken)
         {
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Expires = new DateTimeOffset(refreshToken.Expires),
-                SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
-                Secure = !_env.IsDevelopment()
-            };
-            Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
+            _cookieOptions.Expires = new DateTimeOffset(refreshToken.Expires);
+            Response.Cookies.Append("refreshToken", refreshToken.Token, _cookieOptions);
         }
 
         private void ClearRefreshTokenCookie()
         {
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Expires = DateTime.UtcNow.AddDays(-1), // Set expiry to past to ensure deletion
-                SameSite = SameSiteMode.None,
-                Secure = true // Must match SetRefreshTokenCookie's Secure setting
-            };
-            Response.Cookies.Delete("refreshToken", cookieOptions);
+            _cookieOptions.Expires = DateTime.UtcNow.AddDays(-1);
+            Response.Cookies.Delete("refreshToken", _cookieOptions);
         }
 
         [HttpPost("register")]
