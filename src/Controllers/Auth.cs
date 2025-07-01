@@ -75,7 +75,7 @@ namespace FavoriteQuoutesWebApi.Controllers
             {
                 HttpOnly = true,
                 Expires = new DateTimeOffset(refreshToken.Expires),
-                SameSite = _env.IsDevelopment() ? SameSiteMode.None : SameSiteMode.Lax,
+                SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
                 Secure = !_env.IsDevelopment()
             };
             Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
@@ -117,7 +117,7 @@ namespace FavoriteQuoutesWebApi.Controllers
             // Set refresh token as HTTP-only cookie
             SetRefreshTokenCookie(refreshToken);
 
-            Console.WriteLine($"Refresh tokens (reg): {System.Text.Json.JsonSerializer.Serialize(refreshTokens)}");
+            // Console.WriteLine($"Refresh tokens (reg): {System.Text.Json.JsonSerializer.Serialize(refreshTokens)}");
 
             return Ok(new AuthResponse
             {
@@ -164,7 +164,7 @@ namespace FavoriteQuoutesWebApi.Controllers
         [HttpPost("refresh-token")]
         public IActionResult RefreshToken()
         {
-            Console.WriteLine($"Refresh tokens (rt): {System.Text.Json.JsonSerializer.Serialize(refreshTokens)}");
+            Console.WriteLine($"Refresh tokens (rt): {System.Text.Json.JsonSerializer.Serialize(refreshTokens.Select(t => new { t.Token, t.IsActive }))}");
 
             var refreshTokenString = Request.Cookies["refreshToken"];
             if (string.IsNullOrEmpty(refreshTokenString))
