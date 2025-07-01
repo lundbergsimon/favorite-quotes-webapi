@@ -16,14 +16,16 @@ namespace FavoriteQuoutesWebApi.Controllers
         private static List<RefreshToken> refreshTokens = new List<RefreshToken>();
 
         private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _env;
         private readonly string _secretKey;
         private readonly string _issuer;
         private readonly string _audience;
         private readonly int _accessTokenExpirationMinutes;
         private readonly int _refreshTokenExpirationDays;
 
-        public AuthController(IConfiguration configuration)
+        public AuthController(IConfiguration configuration, IWebHostEnvironment env)
         {
+            _env = env;
             _configuration = configuration;
             var jwtSettings = _configuration.GetSection("Jwt");
             _secretKey = jwtSettings["Key"]!;
@@ -73,8 +75,8 @@ namespace FavoriteQuoutesWebApi.Controllers
             {
                 HttpOnly = true,
                 Expires = new DateTimeOffset(refreshToken.Expires),
-                SameSite = SameSiteMode.None,
-                Secure = true
+                SameSite = _env.IsDevelopment() ? SameSiteMode.None : SameSiteMode.Lax,
+                Secure = !_env.IsDevelopment()
             };
             Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
         }
