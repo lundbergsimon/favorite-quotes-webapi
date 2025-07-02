@@ -1,23 +1,35 @@
 using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using FavoriteQuoutesWebApi.Storage;
 
 namespace FavoriteQuoutesWebApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
+[Authorize]
 public class QuotesController : ControllerBase
 {
-    private static List<Quote> quotes = new List<Quote>();
-    private static int nextId = 1;
+    private readonly IQuoteStore _quoteStore;
+    private readonly IUserStore _userStore;
+
+    public QuotesController(IQuoteStore quoteStore, IUserStore userStore)
+    {
+        _quoteStore = quoteStore;
+        _userStore = userStore;
+    }
 
     /// <summary>
-    /// Retrieves all quotes from the in-memory collection.
+    /// Retrieves all quotes for the current user from the store.
     /// </summary>
-    /// <returns>A list of all quotes currently stored.</returns>
+    /// <returns>A list of all quotes currently stored for the user.</returns>
     [HttpGet]
     public IEnumerable<Quote> GetQuotes()
     {
-        return quotes;
+        var userId = GetUserId();
+        if (userId == null) return [];
+        if (_userStore.GetById(userId.Value) == null) return [];
+        return _quoteStore.GetByUserId(userId.Value);
     }
 
     /// <summary>
@@ -28,11 +40,13 @@ public class QuotesController : ControllerBase
     [HttpGet("{id}")]
     public ActionResult<Quote> GetQuote(int id)
     {
-        var quote = quotes.FirstOrDefault(q => q.Id == id);
+        var userId = GetUserId();
+        if (userId == null || _userStore.GetById(userId.Value) == null)
+            return NotFound();
+        var quote = _quoteStore.GetById(userId.Value, id);
         if (quote == null)
             return NotFound();
-
-        return quote;
+        return Ok(quote);
     }
 
     /// <summary>
@@ -44,13 +58,16 @@ public class QuotesController : ControllerBase
     [HttpPost]
     public IActionResult CreateQuote([FromBody] QuoteCreateRequest quote)
     {
+        var userId = GetUserId();
+        if (userId == null)
+            return Unauthorized();
         var newQuote = new Quote
         {
-            Id = nextId++,
+            // Id should be set by the store
             Text = quote.Text,
             BookId = quote.BookId,
         };
-        quotes.Add(newQuote);
+        _quoteStore.Add(userId.Value, newQuote);
         return CreatedAtAction(nameof(GetQuote), new { id = newQuote.Id }, newQuote);
     }
 
@@ -62,10 +79,22 @@ public class QuotesController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteQuote(int id)
     {
-        var quote = quotes.FirstOrDefault(q => q.Id == id);
+        var userId = GetUserId();
+        if (userId == null || _userStore.GetById(userId.Value) == null)
+            return NotFound();
+        var quote = _quoteStore.GetById(userId.Value, id);
         if (quote == null)
             return NotFound();
-        quotes.Remove(quote);
+        _quoteStore.Remove(userId.Value, id);
         return NoContent();
+    }
+
+    // Helper to get user id from JWT
+    private Guid? GetUserId()
+    {
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdClaim, out var userId))
+            return userId;
+        return null;
     }
 }

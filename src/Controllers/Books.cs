@@ -1,21 +1,37 @@
 using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.AspNetCore.Authorization;
+using FavoriteQuoutesWebApi.Storage;
+
 [ApiController]
 [Route("[controller]")]
+[Authorize]
 public class BooksController : ControllerBase
 {
-    private static List<Book> books = new List<Book>();
-    private static int nextId = 1;
+    private readonly IBookStore _bookStore;
+    private readonly IUserStore _userStore;
+    // Store books per user
+    // private static Dictionary<Guid, List<Book>> userBooks = new Dictionary<Guid, List<Book>>();
+    // private static int nextId = 1;
+
+    public BooksController(IBookStore bookStore, IUserStore userStore)
+    {
+        _bookStore = bookStore;
+        _userStore = userStore;
+    }
 
     /// <summary>
-    /// Retrieves all books from the database.
+    /// Retrieves all books from the store for the current user.
     /// </summary>
-    /// <returns>A list of all books in the database.</returns>
+    /// <returns>A list of all books for the user.</returns>
     [HttpGet]
     public IEnumerable<Book> GetBooks()
     {
-        return books;
+        var userId = GetUserId();
+        if (userId == null) return [];
+        if (_userStore.GetById(userId.Value) == null) return [];
+        return _bookStore.GetByUserId(userId.Value);
     }
 
     /// <summary>
@@ -26,10 +42,12 @@ public class BooksController : ControllerBase
     [HttpGet("{id}")]
     public ActionResult<Book> GetBook(int id)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || _userStore.GetById(userId.Value) == null)
+            return NotFound();
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
-
         return Ok(book);
     }
 
@@ -41,8 +59,12 @@ public class BooksController : ControllerBase
     [HttpPost]
     public IActionResult CreateBook([FromBody] Book book)
     {
-        book.Id = nextId++;
-        books.Add(book);
+        var userId = GetUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        _bookStore.Add(userId.Value, book);
+
         return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
     }
 
@@ -55,13 +77,16 @@ public class BooksController : ControllerBase
     [HttpPut("{id}")]
     public IActionResult EditBook(int id, Book updatedBook)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || _userStore.GetById(userId.Value) == null)
+            return NotFound();
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
-
         book.Title = updatedBook.Title;
         book.Author = updatedBook.Author;
-
+        book.PublishDate = updatedBook.PublishDate;
+        _bookStore.Update(userId.Value, book);
         return NoContent();
     }
 
@@ -73,11 +98,22 @@ public class BooksController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteBook(int id)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || _userStore.GetById(userId.Value) == null)
+            return NotFound();
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
-
-        books.Remove(book);
+        _bookStore.Remove(userId.Value, id);
         return NoContent();
+    }
+
+    // Helper to get user id from JWT
+    private Guid? GetUserId()
+    {
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdClaim, out var userId))
+            return userId;
+        return null;
     }
 }
