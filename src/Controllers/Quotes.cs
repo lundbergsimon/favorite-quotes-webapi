@@ -9,7 +9,8 @@ namespace FavoriteQuoutesWebApi.Controllers;
 [Authorize]
 public class QuotesController : ControllerBase
 {
-    private static List<Quote> quotes = new List<Quote>();
+    // Store quotes per user
+    private static Dictionary<Guid, List<Quote>> userQuotes = new Dictionary<Guid, List<Quote>>();
     private static int nextId = 1;
 
     /// <summary>
@@ -19,7 +20,10 @@ public class QuotesController : ControllerBase
     [HttpGet]
     public IEnumerable<Quote> GetQuotes()
     {
-        return quotes;
+        var userId = GetUserId();
+        if (userId == null) return Enumerable.Empty<Quote>();
+        if (!userQuotes.ContainsKey(userId.Value)) return Enumerable.Empty<Quote>();
+        return userQuotes[userId.Value];
     }
 
     /// <summary>
@@ -30,11 +34,13 @@ public class QuotesController : ControllerBase
     [HttpGet("{id}")]
     public ActionResult<Quote> GetQuote(int id)
     {
-        var quote = quotes.FirstOrDefault(q => q.Id == id);
+        var userId = GetUserId();
+        if (userId == null || !userQuotes.ContainsKey(userId.Value))
+            return NotFound();
+        var quote = userQuotes[userId.Value].FirstOrDefault(q => q.Id == id);
         if (quote == null)
             return NotFound();
-
-        return quote;
+        return Ok(quote);
     }
 
     /// <summary>
@@ -46,13 +52,18 @@ public class QuotesController : ControllerBase
     [HttpPost]
     public IActionResult CreateQuote([FromBody] QuoteCreateRequest quote)
     {
+        var userId = GetUserId();
+        if (userId == null)
+            return Unauthorized();
         var newQuote = new Quote
         {
             Id = nextId++,
             Text = quote.Text,
             BookId = quote.BookId,
         };
-        quotes.Add(newQuote);
+        if (!userQuotes.ContainsKey(userId.Value))
+            userQuotes[userId.Value] = new List<Quote>();
+        userQuotes[userId.Value].Add(newQuote);
         return CreatedAtAction(nameof(GetQuote), new { id = newQuote.Id }, newQuote);
     }
 
@@ -64,10 +75,22 @@ public class QuotesController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteQuote(int id)
     {
-        var quote = quotes.FirstOrDefault(q => q.Id == id);
+        var userId = GetUserId();
+        if (userId == null || !userQuotes.ContainsKey(userId.Value))
+            return NotFound();
+        var quote = userQuotes[userId.Value].FirstOrDefault(q => q.Id == id);
         if (quote == null)
             return NotFound();
-        quotes.Remove(quote);
+        userQuotes[userId.Value].Remove(quote);
         return NoContent();
+    }
+
+    // Helper to get user id from JWT
+    private Guid? GetUserId()
+    {
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdClaim, out var userId))
+            return userId;
+        return null;
     }
 }

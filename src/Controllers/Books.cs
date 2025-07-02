@@ -8,7 +8,8 @@ using Microsoft.AspNetCore.Authorization;
 [Authorize]
 public class BooksController : ControllerBase
 {
-    private static List<Book> books = new List<Book>();
+    // Store books per user
+    private static Dictionary<Guid, List<Book>> userBooks = new Dictionary<Guid, List<Book>>();
     private static int nextId = 1;
 
     /// <summary>
@@ -18,7 +19,10 @@ public class BooksController : ControllerBase
     [HttpGet]
     public IEnumerable<Book> GetBooks()
     {
-        return books;
+        var userId = GetUserId();
+        if (userId == null) return Enumerable.Empty<Book>();
+        if (!userBooks.ContainsKey(userId.Value)) return Enumerable.Empty<Book>();
+        return userBooks[userId.Value];
     }
 
     /// <summary>
@@ -29,10 +33,12 @@ public class BooksController : ControllerBase
     [HttpGet("{id}")]
     public ActionResult<Book> GetBook(int id)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || !userBooks.ContainsKey(userId.Value))
+            return NotFound();
+        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
         if (book == null)
             return NotFound();
-
         return Ok(book);
     }
 
@@ -44,8 +50,13 @@ public class BooksController : ControllerBase
     [HttpPost]
     public IActionResult CreateBook([FromBody] Book book)
     {
+        var userId = GetUserId();
+        if (userId == null)
+            return Unauthorized();
         book.Id = nextId++;
-        books.Add(book);
+        if (!userBooks.ContainsKey(userId.Value))
+            userBooks[userId.Value] = new List<Book>();
+        userBooks[userId.Value].Add(book);
         return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
     }
 
@@ -58,13 +69,15 @@ public class BooksController : ControllerBase
     [HttpPut("{id}")]
     public IActionResult EditBook(int id, Book updatedBook)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || !userBooks.ContainsKey(userId.Value))
+            return NotFound();
+        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
         if (book == null)
             return NotFound();
-
         book.Title = updatedBook.Title;
         book.Author = updatedBook.Author;
-
+        book.PublishDate = updatedBook.PublishDate;
         return NoContent();
     }
 
@@ -76,11 +89,22 @@ public class BooksController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteBook(int id)
     {
-        var book = books.FirstOrDefault(b => b.Id == id);
+        var userId = GetUserId();
+        if (userId == null || !userBooks.ContainsKey(userId.Value))
+            return NotFound();
+        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
         if (book == null)
             return NotFound();
-
-        books.Remove(book);
+        userBooks[userId.Value].Remove(book);
         return NoContent();
+    }
+
+    // Helper to get user id from JWT
+    private Guid? GetUserId()
+    {
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdClaim, out var userId))
+            return userId;
+        return null;
     }
 }
