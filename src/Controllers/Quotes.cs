@@ -1,10 +1,12 @@
 using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FavoriteQuoutesWebApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
+[Authorize]
 public class QuotesController : ControllerBase
 {
     private static List<Quote> quotes = new List<Quote>();

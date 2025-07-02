@@ -1,8 +1,11 @@
 using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.AspNetCore.Authorization;
+
 [ApiController]
 [Route("[controller]")]
+[Authorize]
 public class BooksController : ControllerBase
 {
     private static List<Book> books = new List<Book>();
