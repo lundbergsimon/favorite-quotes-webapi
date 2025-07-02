@@ -31,6 +31,8 @@ This is an ASP.NET 8 C# Web API for managing users, books, and quotes. It is des
 ### API Endpoints
 - `POST /auth/register` — Register a new user and login
 - `POST /auth/login` — Login and receive JWT + refresh token cookie
+- `POST /auth/logout` — Logout an authenticated user
+- `POST /auth/delete-account` — Delete an authenticated user
 - `GET /books` — List all books
 - `POST /books` — Add a new book
 - `PUT /books/{id}` — Update a book
