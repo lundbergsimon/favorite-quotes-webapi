@@ -2,27 +2,36 @@ using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
 
 using Microsoft.AspNetCore.Authorization;
+using FavoriteQuoutesWebApi.Storage;
 
 [ApiController]
 [Route("[controller]")]
 [Authorize]
 public class BooksController : ControllerBase
 {
+    private readonly IBookStore _bookStore;
+    private readonly IUserStore _userStore;
     // Store books per user
-    private static Dictionary<Guid, List<Book>> userBooks = new Dictionary<Guid, List<Book>>();
-    private static int nextId = 1;
+    // private static Dictionary<Guid, List<Book>> userBooks = new Dictionary<Guid, List<Book>>();
+    // private static int nextId = 1;
+
+    public BooksController(IBookStore bookStore, IUserStore userStore)
+    {
+        _bookStore = bookStore;
+        _userStore = userStore;
+    }
 
     /// <summary>
-    /// Retrieves all books from the database.
+    /// Retrieves all books from the store for the current user.
     /// </summary>
-    /// <returns>A list of all books in the database.</returns>
+    /// <returns>A list of all books for the user.</returns>
     [HttpGet]
     public IEnumerable<Book> GetBooks()
     {
         var userId = GetUserId();
-        if (userId == null) return Enumerable.Empty<Book>();
-        if (!userBooks.ContainsKey(userId.Value)) return Enumerable.Empty<Book>();
-        return userBooks[userId.Value];
+        if (userId == null) return [];
+        if (_userStore.GetById(userId.Value) == null) return [];
+        return _bookStore.GetByUserId(userId.Value);
     }
 
     /// <summary>
@@ -34,9 +43,9 @@ public class BooksController : ControllerBase
     public ActionResult<Book> GetBook(int id)
     {
         var userId = GetUserId();
-        if (userId == null || !userBooks.ContainsKey(userId.Value))
+        if (userId == null || _userStore.GetById(userId.Value) == null)
             return NotFound();
-        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
         return Ok(book);
@@ -53,10 +62,9 @@ public class BooksController : ControllerBase
         var userId = GetUserId();
         if (userId == null)
             return Unauthorized();
-        book.Id = nextId++;
-        if (!userBooks.ContainsKey(userId.Value))
-            userBooks[userId.Value] = new List<Book>();
-        userBooks[userId.Value].Add(book);
+
+        _bookStore.Add(userId.Value, book);
+
         return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
     }
 
@@ -70,14 +78,15 @@ public class BooksController : ControllerBase
     public IActionResult EditBook(int id, Book updatedBook)
     {
         var userId = GetUserId();
-        if (userId == null || !userBooks.ContainsKey(userId.Value))
+        if (userId == null || _userStore.GetById(userId.Value) == null)
             return NotFound();
-        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
         book.Title = updatedBook.Title;
         book.Author = updatedBook.Author;
         book.PublishDate = updatedBook.PublishDate;
+        _bookStore.Update(userId.Value, book);
         return NoContent();
     }
 
@@ -90,12 +99,12 @@ public class BooksController : ControllerBase
     public IActionResult DeleteBook(int id)
     {
         var userId = GetUserId();
-        if (userId == null || !userBooks.ContainsKey(userId.Value))
+        if (userId == null || _userStore.GetById(userId.Value) == null)
             return NotFound();
-        var book = userBooks[userId.Value].FirstOrDefault(b => b.Id == id);
+        var book = _bookStore.GetById(userId.Value, id);
         if (book == null)
             return NotFound();
-        userBooks[userId.Value].Remove(book);
+        _bookStore.Remove(userId.Value, id);
         return NoContent();
     }
 
