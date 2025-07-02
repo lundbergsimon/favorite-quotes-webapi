@@ -4,6 +4,7 @@ namespace FavoriteQuoutesWebApi.Controllers
     using System.Security.Claims;
     using System.Text;
     using FavoriteQuoutesWebApi.Models;
+    using FavoriteQuoutesWebApi.Storage;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.IdentityModel.Tokens;
 
@@ -276,6 +277,38 @@ namespace FavoriteQuoutesWebApi.Controllers
 
             // Return success response
             return Ok(new { message = "Logged out successfully!" });
+        }
+
+        /// <summary>
+        /// Deletes the current user account and all associated data (refresh tokens, books, quotes).
+        /// </summary>
+        /// <returns>A JSON response with a success message.</returns>
+        [HttpDelete("delete-account")]
+        public IActionResult DeleteAccount()
+        {
+            // Get user id from JWT
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { message = "User not authenticated." });
+
+            // Remove user from user store
+            var user = _userStore.GetById(userId);
+            if (user != null)
+                _userStore.Remove(userId);
+
+            // Remove all refresh tokens for this user
+            _refreshTokenStore.RemoveAllForUser(userId);
+
+            // Remove all books for this user
+            _bookStore.RemoveAllForUser(userId);
+
+            // Remove all quotes for this user
+            _quoteStore.RemoveAllForUser(userId);
+
+            // Clear refresh token cookie
+            ClearRefreshTokenCookie();
+
+            return Ok(new { message = "Account and all associated data deleted successfully." });
         }
     }
 }
