@@ -1,6 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using FavoriteQuoutesWebApi.Models;
+using FavoriteQuoutesWebApi.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
+// Register in-memory stores for dependency injection
+builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
+builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
+builder.Services.AddSingleton<IBookStore, InMemoryBookStore>();
+builder.Services.AddSingleton<IQuoteStore, InMemoryQuoteStore>();
 
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();
