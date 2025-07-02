@@ -1,6 +1,7 @@
 using FavoriteQuoutesWebApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using FavoriteQuoutesWebApi.Storage;
 
 namespace FavoriteQuoutesWebApi.Controllers;
 
@@ -9,21 +10,26 @@ namespace FavoriteQuoutesWebApi.Controllers;
 [Authorize]
 public class QuotesController : ControllerBase
 {
-    // Store quotes per user
-    private static Dictionary<Guid, List<Quote>> userQuotes = new Dictionary<Guid, List<Quote>>();
-    private static int nextId = 1;
+    private readonly IQuoteStore _quoteStore;
+    private readonly IUserStore _userStore;
+
+    public QuotesController(IQuoteStore quoteStore, IUserStore userStore)
+    {
+        _quoteStore = quoteStore;
+        _userStore = userStore;
+    }
 
     /// <summary>
-    /// Retrieves all quotes from the in-memory collection.
+    /// Retrieves all quotes for the current user from the store.
     /// </summary>
-    /// <returns>A list of all quotes currently stored.</returns>
+    /// <returns>A list of all quotes currently stored for the user.</returns>
     [HttpGet]
     public IEnumerable<Quote> GetQuotes()
     {
         var userId = GetUserId();
-        if (userId == null) return Enumerable.Empty<Quote>();
-        if (!userQuotes.ContainsKey(userId.Value)) return Enumerable.Empty<Quote>();
-        return userQuotes[userId.Value];
+        if (userId == null) return [];
+        if (_userStore.GetById(userId.Value) == null) return [];
+        return _quoteStore.GetByUserId(userId.Value);
     }
 
     /// <summary>
@@ -35,9 +41,9 @@ public class QuotesController : ControllerBase
     public ActionResult<Quote> GetQuote(int id)
     {
         var userId = GetUserId();
-        if (userId == null || !userQuotes.ContainsKey(userId.Value))
+        if (userId == null || _userStore.GetById(userId.Value) == null)
             return NotFound();
-        var quote = userQuotes[userId.Value].FirstOrDefault(q => q.Id == id);
+        var quote = _quoteStore.GetById(userId.Value, id);
         if (quote == null)
             return NotFound();
         return Ok(quote);
@@ -57,13 +63,11 @@ public class QuotesController : ControllerBase
             return Unauthorized();
         var newQuote = new Quote
         {
-            Id = nextId++,
+            // Id should be set by the store
             Text = quote.Text,
             BookId = quote.BookId,
         };
-        if (!userQuotes.ContainsKey(userId.Value))
-            userQuotes[userId.Value] = new List<Quote>();
-        userQuotes[userId.Value].Add(newQuote);
+        _quoteStore.Add(userId.Value, newQuote);
         return CreatedAtAction(nameof(GetQuote), new { id = newQuote.Id }, newQuote);
     }
 
@@ -76,12 +80,12 @@ public class QuotesController : ControllerBase
     public IActionResult DeleteQuote(int id)
     {
         var userId = GetUserId();
-        if (userId == null || !userQuotes.ContainsKey(userId.Value))
+        if (userId == null || _userStore.GetById(userId.Value) == null)
             return NotFound();
-        var quote = userQuotes[userId.Value].FirstOrDefault(q => q.Id == id);
+        var quote = _quoteStore.GetById(userId.Value, id);
         if (quote == null)
             return NotFound();
-        userQuotes[userId.Value].Remove(quote);
+        _quoteStore.Remove(userId.Value, id);
         return NoContent();
     }
 
