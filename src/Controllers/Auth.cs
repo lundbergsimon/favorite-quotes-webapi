@@ -11,8 +11,10 @@ namespace FavoriteQuoutesWebApi.Controllers
     [Route("auth")]
     public class AuthController : ControllerBase
     {
-        private static List<User> users = new List<User>();
-        private static List<RefreshToken> refreshTokens = new List<RefreshToken>();
+        private readonly IUserStore _userStore;
+        private readonly IRefreshTokenStore _refreshTokenStore;
+        private readonly IBookStore _bookStore;
+        private readonly IQuoteStore _quoteStore;
 
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
@@ -21,7 +23,7 @@ namespace FavoriteQuoutesWebApi.Controllers
         private readonly string _audience;
         private readonly int _accessTokenExpirationMinutes;
         private readonly int _refreshTokenExpirationDays;
-        private CookieOptions _cookieOptions;
+        private readonly CookieOptions _cookieOptions;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AuthController"/> class.
@@ -30,10 +32,20 @@ namespace FavoriteQuoutesWebApi.Controllers
         /// </summary>
         /// <param name="configuration">The configuration interface providing access to application settings.</param>
         /// <param name="env">The hosting environment interface providing environment-specific information.</param>
-        public AuthController(IConfiguration configuration, IWebHostEnvironment env)
+        public AuthController(
+            IConfiguration configuration,
+            IWebHostEnvironment env,
+            IUserStore userStore,
+            IRefreshTokenStore refreshTokenStore,
+            IBookStore bookStore,
+            IQuoteStore quoteStore)
         {
             _env = env;
             _configuration = configuration;
+            _userStore = userStore;
+            _refreshTokenStore = refreshTokenStore;
+            _bookStore = bookStore;
+            _quoteStore = quoteStore;
             var jwtSettings = _configuration.GetSection("Jwt");
             _secretKey = jwtSettings["Key"]!;
             _issuer = jwtSettings["Issuer"]!;
@@ -114,7 +126,7 @@ namespace FavoriteQuoutesWebApi.Controllers
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest request)
         {
-            if (users.Any(u => u.Username == request.Username))
+            if (_userStore.GetByUsername(request.Username) != null)
                 return Conflict(new { message = "Username already exists." });
 
             var newUser = new User
@@ -123,12 +135,12 @@ namespace FavoriteQuoutesWebApi.Controllers
                 PasswordHash = request.Password // TODO: Hash password
             };
 
-            users.Add(newUser);
+            _userStore.Add(newUser);
 
             var accessToken = GenerateAccessToken(newUser);
             var refreshToken = GenerateRefreshtoken(newUser, HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown");
 
-            refreshTokens.Add(refreshToken);
+            _refreshTokenStore.Add(refreshToken);
 
             // Set refresh token as HTTP-only cookie
             SetRefreshTokenCookie(refreshToken);
@@ -149,7 +161,7 @@ namespace FavoriteQuoutesWebApi.Controllers
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
-            var user = users.FirstOrDefault(u => u.Username == request.Username);
+            var user = _userStore.GetByUsername(request.Username);
 
             if (user == null || user.PasswordHash != request.Password) // TODO: Hash password
                 return Unauthorized(new { message = "Invalid credentials." });
@@ -158,14 +170,14 @@ namespace FavoriteQuoutesWebApi.Controllers
             var refreshToken = GenerateRefreshtoken(user, HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown");
 
             // Revoke any existing refresh tokens for this user for security
-            var existingRefreshTokens = refreshTokens.Where(t => t.UserId == user.Id && t.IsActive).ToList();
+            var existingRefreshTokens = _refreshTokenStore.GetByUserId(user.Id);
             foreach (var token in existingRefreshTokens)
             {
                 token.Revoked = DateTime.UtcNow;
                 token.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             }
 
-            refreshTokens.Add(refreshToken);
+            _refreshTokenStore.Add(refreshToken);
 
             SetRefreshTokenCookie(refreshToken);
 
@@ -193,15 +205,15 @@ namespace FavoriteQuoutesWebApi.Controllers
                 return Unauthorized(new { message = "Refresh token not found." });
             }
 
-            var refreshToken = refreshTokens.SingleOrDefault(t => t.Token == refreshTokenString && t.IsActive);
+            var refreshToken = _refreshTokenStore.GetByToken(refreshTokenString);
             if (refreshToken == null)
             {
                 // Refresh token is invalid or revoked. Attempt to detect reuse.
-                var userWhoTriedToReuse = refreshTokens.SingleOrDefault(t => t.Token == refreshTokenString)?.UserId;
+                var userWhoTriedToReuse = _refreshTokenStore.GetByToken(refreshTokenString)?.UserId;
                 if (userWhoTriedToReuse != null)
                 {
                     // If a revoked token was sent, invalidate all tokens for that user
-                    var allUserTokens = refreshTokens.Where(t => t.UserId == userWhoTriedToReuse).ToList();
+                    var allUserTokens = _refreshTokenStore.GetByUserId(userWhoTriedToReuse.Value);
                     foreach (var token in allUserTokens)
                     {
                         token.Revoked = DateTime.UtcNow;
@@ -211,7 +223,7 @@ namespace FavoriteQuoutesWebApi.Controllers
                 return Unauthorized(new { message = "Invalid or expired refresh token." });
             }
 
-            var user = users.SingleOrDefault(u => u.Id == refreshToken.UserId);
+            var user = _userStore.GetById(refreshToken.UserId);
             if (user == null)
             {
                 return Unauthorized(new { message = "User associated with refresh token not found." });
@@ -226,7 +238,8 @@ namespace FavoriteQuoutesWebApi.Controllers
             refreshToken.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             refreshToken.ReplacedByToken = newRefreshToken.Token;
 
-            refreshTokens.Add(newRefreshToken);
+            _refreshTokenStore.Update(refreshToken);
+            _refreshTokenStore.Add(newRefreshToken);
 
             // Set refresh token as HTTP-only cookie
             SetRefreshTokenCookie(newRefreshToken);
@@ -250,7 +263,7 @@ namespace FavoriteQuoutesWebApi.Controllers
             if (!string.IsNullOrEmpty(refreshTokenString))
             {
                 // Revoke the refresh token
-                var refreshToken = refreshTokens.SingleOrDefault(t => t.Token == refreshTokenString);
+                var refreshToken = _refreshTokenStore.GetByToken(refreshTokenString);
                 if (refreshToken != null)
                 {
                     refreshToken.Revoked = DateTime.UtcNow;
