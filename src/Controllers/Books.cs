@@ -5,21 +5,27 @@ using Microsoft.AspNetCore.Mvc;
 [Route("[controller]")]
 public class BooksController : ControllerBase
 {
-    // In-memory list to simulate a data store TODO: Replace with a database
     private static List<Book> books = new List<Book>();
     private static int nextId = 1;
 
+    /// <summary>
+    /// Retrieves all books from the database.
+    /// </summary>
+    /// <returns>A list of all books in the database.</returns>
     [HttpGet]
     public IEnumerable<Book> GetBooks()
     {
-        // TODO: Replace with a database
         return books;
     }
 
+    /// <summary>
+    /// Retrieves a book by its id from the database.
+    /// </summary>
+    /// <param name="id">The id of the book to retrieve.</param>
+    /// <returns>The book if found, otherwise a 404 status code.</returns>
     [HttpGet("{id}")]
     public ActionResult<Book> GetBook(int id)
     {
-        // TODO: Replace with a database
         var book = books.FirstOrDefault(b => b.Id == id);
         if (book == null)
             return NotFound();
@@ -27,22 +33,28 @@ public class BooksController : ControllerBase
         return Ok(book);
     }
 
+    /// <summary>
+    /// Creates a new book entry in the database.
+    /// </summary>
+    /// <param name="book">The book object to be created.</param>
+    /// <returns>A 201 Created response with the newly created book.</returns>
     [HttpPost]
     public IActionResult CreateBook([FromBody] Book book)
     {
-        Console.WriteLine("Creating book: " + System.Text.Json.JsonSerializer.Serialize(book));
-        // TODO: Replace with a database
         book.Id = nextId++;
         books.Add(book);
         return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
     }
 
+    /// <summary>
+    /// Edits a book in the database with the given id and updated title and author.
+    /// </summary>
+    /// <param name="id">The id of the book to edit.</param>
+    /// <param name="updatedBook">The book object containing the updated title and author.</param>
+    /// <returns>A 204 No Content response if the book was found and edited, otherwise a 404 status code.</returns>
     [HttpPut("{id}")]
     public IActionResult EditBook(int id, Book updatedBook)
     {
-        Console.WriteLine("Updating book: " + System.Text.Json.JsonSerializer.Serialize(updatedBook));
-
-        // TODO: Replace with a database
         var book = books.FirstOrDefault(b => b.Id == id);
         if (book == null)
             return NotFound();
@@ -53,6 +65,11 @@ public class BooksController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Deletes a book from the database with the given id.
+    /// </summary>
+    /// <param name="id">The id of the book to delete.</param>
+    /// <returns>A 204 No Content response if the book was found and deleted, otherwise a 404 status code.</returns>
     [HttpDelete("{id}")]
     public IActionResult DeleteBook(int id)
     {

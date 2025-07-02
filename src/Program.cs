@@ -21,8 +21,6 @@ builder.Services.AddCors(
             {
                 policy
                     .WithOrigins("https://books-and-quotes-frontend.onrender.com")
-                    // .WithMethods("GET", "POST", "PUT", "DELETE")
-                    // .WithHeaders("Content-Type", "Authorization")
                     .AllowAnyMethod()
                     .AllowAnyHeader()
                     .AllowCredentials();
@@ -34,12 +32,11 @@ builder.Services.AddCors(
 // Build app
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-// if (app.Environment.IsDevelopment())
-// {
-app.UseSwagger();
-app.UseSwaggerUI();
-// }
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 // Configure the HTTP request pipeline to use HTTPS redirection.
 app.UseHttpsRedirection();
